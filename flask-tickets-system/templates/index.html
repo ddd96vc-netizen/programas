@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio - Gestor de Compras{% endblock %}
+
+{% block content %}
+
+<div class="dashboard">
+    <div class="page-header">
+        <h1><i class="fas fa-chart-line"></i> Dashboard</h1>
+        <p class="subtitle">Resumen general de tus compras</p>
+    </div>
+    
+    <!-- TARJETAS DE ESTADÍSTICAS RÁPIDAS -->
+    <div class="stats-cards">
+        <div class="stat-card card-blue">
+            <div class="stat-icon">
+                <i class="fas fa-receipt"></i>
+            </div>
+            <div class="stat-content">
+                <h3>Total Tickets</h3>
+                <p class="stat-number">{{ total_tickets }}</p>
+                <span class="stat-label">tickets registrados</span>
+            </div>
+        </div>
+        
+        <div class="stat-card card-green">
+            <div class="stat-icon">
+                <i class="fas fa-euro-sign"></i>
+            </div>
+            <div class="stat-content">
+                <h3>Total Gastado</h3>
+                <p class="stat-number">{{ total_gastado }}€</p>
+                <span class="stat-label">en total</span>
+            </div>
+        </div>
+        
+        <div class="stat-card card-purple">
+            <div class="stat-icon">
+                <i class="fas fa-chart-bar"></i>
+            </div>
+            <div class="stat-content">
+                <h3>Promedio/Ticket</h3>
+                <p class="stat-number">{{ promedio_ticket }}€</p>
+                <span class="stat-label">por compra</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ACCIONES RÁPIDAS -->
+    <div class="quick-actions">
+        <h2><i class="fas fa-bolt"></i> Acciones Rápidas</h2>
+        <div class="actions-grid">
+            <a href="/nuevo_ticket" class="action-btn">
+                <i class="fas fa-plus-circle"></i>
+                <span>Nuevo Ticket</span>
+            </a>
+            <a href="/buscar_producto" class="action-btn">
+                <i class="fas fa-search"></i>
+                <span>Buscar Producto</span>
+            </a>
+            <a href="/estadisticas" class="action-btn">
+                <i class="fas fa-chart-pie"></i>
+                <span>Ver Estadísticas</span>
+            </a>
+            <a href="/categorias" class="action-btn">
+                <i class="fas fa-tags"></i>
+                <span>Categorías</span>
+            </a>
+        </div>
+    </div>
+    
+    <!-- ÚLTIMOS TICKETS -->
+    <div class="recent-section">
+        <div class="section-header">
+            <h2><i class="fas fa-clock"></i> Últimos Tickets</h2>
+            <a href="/ver_tickets" class="btn-link">Ver todos <i class="fas fa-arrow-right"></i></a>
+        </div>
+        
+        {% if tickets %}
+        <div class="tickets-table-container">
+            <table class="tickets-table">
+                <thead>
+                    <tr>
+                        <th><i class="fas fa-store"></i> Tienda</th>
+                        <th><i class="fas fa-calendar"></i> Fecha</th>
+                        <th><i class="fas fa-box"></i> Productos</th>
+                        <th><i class="fas fa-euro-sign"></i> Total</th>
+                        <th><i class="fas fa-cog"></i> Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in tickets %}
+                    <tr>
+                        <td class="ticket-tienda">
+                            <i class="fas fa-shopping-cart"></i>
+                            <strong>{{ ticket.tienda }}</strong>
+                        </td>
+                        <td>{{ ticket.fecha[:10] }}</td>
+                        <td>
+                            <span class="badge badge-info">
+                                {{ ticket.productos|length }} items
+                            </span>
+                        </td>
+                        <td class="ticket-total">
+                            <strong>{{ "%.2f"|format(ticket.total) }}€</strong>
+                        </td>
+                        <td class="actions-cell">
+                            <a href="/ticket/{{ ticket.id }}" class="btn-icon btn-view" title="Ver detalle">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="/editar_ticket/{{ ticket.id }}" class="btn-icon btn-edit" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button onclick="confirmarEliminar('{{ ticket.id }}', '{{ ticket.tienda }}')" 
+                                    class="btn-icon btn-delete" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <p>No hay tickets registrados aún</p>
+            <a href="/nuevo_ticket" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Crear primer ticket
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- GRÁFICO (si hay datos) -->
+    {% if tickets %}
+    <div class="chart-section">
+        <h2><i class="fas fa-chart-pie"></i> Vista Rápida - Gastos por Tienda</h2>
+        <div class="chart-container">
+            <canvas id="graficoTiendasHome"></canvas>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    // Función para confirmar eliminación
+    function confirmarEliminar(ticketId, tienda) {
+        if (confirm(`¿Estás seguro de eliminar el ticket de "${tienda}"?`)) {
+            // Crear formulario y enviarlo
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/eliminar_ticket/${ticketId}`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    
+    // Cargar gráfico si hay tickets
+    {% if tickets %}
+    fetch('/api/estadisticas/resumen')
+        .then(response => response.json())
+        .then(data => {
+            if (data.tiendas && data.tiendas.tiendas) {
+                crearGraficoTiendas(data.tiendas.tiendas);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    
+    function crearGraficoTiendas(tiendas) {
+        const ctx = document.getElementById('graficoTiendasHome');
+        if (!ctx) return;
+        
+        const nombres = tiendas.map(t => t.nombre);
+        const totales = tiendas.map(t => t.total);
+        
+        // Si Chart.js está cargado
+        if (typeof Chart !== 'undefined') {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: nombres,
+                    datasets: [{
+                        label: 'Total gastado (€)',
+                        data: totales,
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)',
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    }
+    {% endif %}
+</script>
+
+{% endblock %}

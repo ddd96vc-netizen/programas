@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Ticket - Gestor de Compras{% endblock %}
+
+{% block content %}
+
+<div class="form-page">
+    <div class="page-header">
+        <h1><i class="fas fa-plus-circle"></i> Nuevo Ticket</h1>
+        <p class="subtitle">Registra una nueva compra</p>
+    </div>
+    
+    <form method="POST" action="/nuevo_ticket" id="formTicket" class="ticket-form">
+        
+        <!-- INFORMACIÓN DEL TICKET -->
+        <div class="form-section">
+            <h2><i class="fas fa-info-circle"></i> Información General</h2>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="tienda">
+                        <i class="fas fa-store"></i> Tienda *
+                    </label>
+                    <input type="text" 
+                           id="tienda" 
+                           name="tienda" 
+                           placeholder="Ej: Mercadona, Carrefour..."
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="fecha">
+                        <i class="fas fa-calendar"></i> Fecha y Hora *
+                    </label>
+                    <input type="datetime-local" 
+                           id="fecha" 
+                           name="fecha" 
+                           required>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PRODUCTOS -->
+        <div class="form-section">
+            <div class="section-header-inline">
+                <h2><i class="fas fa-shopping-basket"></i> Productos</h2>
+                <button type="button" onclick="agregarProducto()" class="btn btn-secondary">
+                    <i class="fas fa-plus"></i> Agregar Producto
+                </button>
+            </div>
+            
+            <div id="productos-container" class="productos-list">
+                <!-- Los productos se añaden aquí dinámicamente -->
+            </div>
+            
+            <div class="empty-products" id="emptyProducts">
+                <i class="fas fa-shopping-cart"></i>
+                <p>No hay productos agregados</p>
+                <button type="button" onclick="agregarProducto()" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Agregar primer producto
+                </button>
+            </div>
+        </div>
+        
+        <!-- TOTAL -->
+        <div class="form-section total-section">
+            <div class="total-display">
+                <span class="total-label">Total:</span>
+                <span class="total-amount">
+                    <i class="fas fa-euro-sign"></i>
+                    <span id="totalAmount">0.00</span>
+                </span>
+            </div>
+        </div>
+        
+        <!-- BOTONES DE ACCIÓN -->
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save"></i> Guardar Ticket
+            </button>
+            <a href="/" class="btn btn-secondary btn-lg">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+        
+    </form>
+</div>
+
+<!-- TEMPLATE PARA NUEVO PRODUCTO (invisible, se clona con JavaScript) -->
+<template id="productoTemplate">
+    <div class="producto-item">
+        <div class="producto-number"></div>
+        <div class="producto-fields">
+            <div class="form-group">
+                <label>Nombre del producto *</label>
+                <input type="text" 
+                       name="producto_nombre[]" 
+                       placeholder="Ej: Leche, Pan, Manzanas..." 
+                       required>
+            </div>
+            
+            <div class="form-group">
+                <label>Precio (€) *</label>
+                <input type="number" 
+                       name="producto_precio[]" 
+                       placeholder="0.00" 
+                       step="0.01" 
+                       min="0"
+                       required 
+                       oninput="actualizarTotal()">
+            </div>
+            
+            <div class="form-group">
+                <label>Categoría</label>
+                <select name="producto_categoria[]">
+                    <option value="">Sin categoría</option>
+                    {% for categoria in categorias %}
+                    <option value="{{ categoria }}">{{ categoria }}</option>
+                    {% endfor %}
+                    <option value="__nueva__">+ Nueva categoría...</option>
+                </select>
+            </div>
+            
+            <div class="form-group form-group-full">
+                <label>Observación</label>
+                <input type="text" 
+                       name="producto_observacion[]" 
+                       placeholder="Notas adicionales (opcional)">
+            </div>
+        </div>
+        <button type="button" 
+                class="btn-remove-product" 
+                onclick="eliminarProducto(this)"
+                title="Eliminar producto">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+</template>
+
+<script>
+    let contadorProductos = 0;
+    
+    // Establecer fecha/hora actual por defecto
+    document.addEventListener('DOMContentLoaded', function() {
+        const ahora = new Date();
+        // Formatear a YYYY-MM-DDThh:mm
+        const fechaLocal = ahora.getFullYear() + '-' +
+            String(ahora.getMonth() + 1).padStart(2, '0') + '-' +
+            String(ahora.getDate()).padStart(2, '0') + 'T' +
+            String(ahora.getHours()).padStart(2, '0') + ':' +
+            String(ahora.getMinutes()).padStart(2, '0');
+        
+        document.getElementById('fecha').value = fechaLocal;
+        
+        // Agregar primer producto automáticamente
+        agregarProducto();
+    });
+    
+    function agregarProducto() {
+        contadorProductos++;
+        
+        // Clonar el template
+        const template = document.getElementById('productoTemplate');
+        const clone = template.content.cloneNode(true);
+        
+        // Actualizar el número del producto
+        clone.querySelector('.producto-number').textContent = `#${contadorProductos}`;
+        
+        // Añadir al contenedor
+        const container = document.getElementById('productos-container');
+        container.appendChild(clone);
+        
+        // Ocultar mensaje de "vacío"
+        document.getElementById('emptyProducts').style.display = 'none';
+        
+        // Hacer scroll al nuevo producto
+        setTimeout(() => {
+            container.lastElementChild.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest' 
+            });
+        }, 100);
+    }
+    
+    function eliminarProducto(btn) {
+        const productoItem = btn.closest('.producto-item');
+        productoItem.remove();
+        
+        // Si no quedan productos, mostrar mensaje
+        const container = document.getElementById('productos-container');
+        if (container.children.length === 0) {
+            document.getElementById('emptyProducts').style.display = 'flex';
+            contadorProductos = 0;
+        } else {
+            // Renumerar productos
+            const items = container.querySelectorAll('.producto-item');
+            items.forEach((item, index) => {
+                item.querySelector('.producto-number').textContent = `#${index + 1}`;
+            });
+            contadorProductos = items.length;
+        }
+        
+        actualizarTotal();
+    }
+    
+    function actualizarTotal() {
+        let total = 0;
+        const precios = document.querySelectorAll('input[name="producto_precio[]"]');
+        
+        precios.forEach(input => {
+            const valor = parseFloat(input.value) || 0;
+            total += valor;
+        });
+        
+        document.getElementById('totalAmount').textContent = total.toFixed(2);
+    }
+    
+    // Validación antes de enviar
+    document.getElementById('formTicket').addEventListener('submit', function(e) {
+        const container = document.getElementById('productos-container');
+        if (container.children.length === 0) {
+            e.preventDefault();
+            alert('❌ Debes agregar al menos un producto');
+            return false;
+        }
+    });
+</script>
+
+{% endblock %}

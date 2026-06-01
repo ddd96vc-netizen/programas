@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Ticket - Gestor de Compras{% endblock %}
+
+{% block content %}
+
+<div class="form-page">
+    <div class="page-header">
+        <h1><i class="fas fa-edit"></i> Editar Ticket</h1>
+        <p class="subtitle">{{ ticket.tienda }} - {{ ticket.fecha[:10] }}</p>
+    </div>
+    
+    <form method="POST" action="/editar_ticket/{{ ticket.id }}" id="formTicket" class="ticket-form">
+        
+        <!-- INFORMACIÓN DEL TICKET -->
+        <div class="form-section">
+            <h2><i class="fas fa-info-circle"></i> Información General</h2>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="tienda">
+                        <i class="fas fa-store"></i> Tienda *
+                    </label>
+                    <input type="text" 
+                           id="tienda" 
+                           name="tienda" 
+                           value="{{ ticket.tienda }}"
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="fecha">
+                        <i class="fas fa-calendar"></i> Fecha y Hora *
+                    </label>
+                    <input type="datetime-local" 
+                           id="fecha" 
+                           name="fecha"
+                           value="{{ ticket.fecha[:16] }}"
+                           required>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PRODUCTOS EXISTENTES -->
+        <div class="form-section">
+            <div class="section-header-inline">
+                <h2><i class="fas fa-shopping-basket"></i> Productos</h2>
+                <button type="button" onclick="agregarProducto()" class="btn btn-secondary">
+                    <i class="fas fa-plus"></i> Agregar Producto
+                </button>
+            </div>
+            
+            <div id="productos-container" class="productos-list">
+                {% for producto in ticket.productos %}
+                <div class="producto-item">
+                    <div class="producto-number">#{{ loop.index }}</div>
+                    <div class="producto-fields">
+                        <div class="form-group">
+                            <label>Nombre del producto *</label>
+                            <input type="text" 
+                                   name="producto_nombre[]" 
+                                   value="{{ producto.nombre }}"
+                                   required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Precio (€) *</label>
+                            <input type="number" 
+                                   name="producto_precio[]" 
+                                   value="{{ producto.precio }}"
+                                   step="0.01" 
+                                   min="0"
+                                   required 
+                                   oninput="actualizarTotal()">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Categoría</label>
+                            <select name="producto_categoria[]">
+                                <option value="">Sin categoría</option>
+                                {% for cat in categorias %}
+                                <option value="{{ cat }}" {% if producto.categoria == cat %}selected{% endif %}>
+                                    {{ cat }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group form-group-full">
+                            <label>Observación</label>
+                            <input type="text" 
+                                   name="producto_observacion[]" 
+                                   value="{{ producto.observacion or '' }}"
+                                   placeholder="Notas adicionales (opcional)">
+                        </div>
+                    </div>
+                    <button type="button" 
+                            class="btn-remove-product" 
+                            onclick="eliminarProducto(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- TOTAL -->
+        <div class="form-section total-section">
+            <div class="total-display">
+                <span class="total-label">Total:</span>
+                <span class="total-amount">
+                    <i class="fas fa-euro-sign"></i>
+                    <span id="totalAmount">{{ "%.2f"|format(ticket.total) }}</span>
+                </span>
+            </div>
+        </div>
+        
+        <!-- BOTONES -->
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+            <a href="/ticket/{{ ticket.id }}" class="btn btn-secondary btn-lg">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+        
+    </form>
+</div>
+
+<!-- Template para nuevos productos -->
+<template id="productoTemplate">
+    <div class="producto-item">
+        <div class="producto-number"></div>
+        <div class="producto-fields">
+            <div class="form-group">
+                <label>Nombre del producto *</label>
+                <input type="text" name="producto_nombre[]" required>
+            </div>
+            <div class="form-group">
+                <label>Precio (€) *</label>
+                <input type="number" name="producto_precio[]" step="0.01" min="0" required oninput="actualizarTotal()">
+            </div>
+            <div class="form-group">
+                <label>Categoría</label>
+                <select name="producto_categoria[]">
+                    <option value="">Sin categoría</option>
+                    {% for cat in categorias %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group form-group-full">
+                <label>Observación</label>
+                <input type="text" name="producto_observacion[]">
+            </div>
+        </div>
+        <button type="button" class="btn-remove-product" onclick="eliminarProducto(this)">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+</template>
+
+<script>
+    let contadorProductos = {{ ticket.productos|length }};
+    
+    // Calcular total inicial
+    document.addEventListener('DOMContentLoaded', function() {
+        actualizarTotal();
+    });
+    
+    function agregarProducto() {
+        contadorProductos++;
+        const template = document.getElementById('productoTemplate');
+        const clone = template.content.cloneNode(true);
+        clone.querySelector('.producto-number').textContent = `#${contadorProductos}`;
+        document.getElementById('productos-container').appendChild(clone);
+    }
+    
+    function eliminarProducto(btn) {
+        if (confirm('¿Eliminar este producto?')) {
+            btn.closest('.producto-item').remove();
+            const items = document.querySelectorAll('.producto-item');
+            items.forEach((item, index) => {
+                item.querySelector('.producto-number').textContent = `#${index + 1}`;
+            });
+            contadorProductos = items.length;
+            actualizarTotal();
+        }
+    }
+    
+    function actualizarTotal() {
+        let total = 0;
+        document.querySelectorAll('input[name="producto_precio[]"]').forEach(input => {
+            total += parseFloat(input.value) || 0;
+        });
+        document.getElementById('totalAmount').textContent = total.toFixed(2);
+    }
+</script>
+
+{% endblock %}

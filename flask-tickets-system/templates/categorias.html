@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% block title %}Categorías - Gestor de Compras{% endblock %}
+
+{% block content %}
+
+<div class="categorias-page">
+    <div class="page-header">
+        <h1><i class="fas fa-tags"></i> Gestión de Categorías</h1>
+        <p class="subtitle">Organiza tus productos por categorías</p>
+    </div>
+    
+    {% if stats %}
+        <!-- RESUMEN -->
+        <div class="card">
+            <h2><i class="fas fa-chart-pie"></i> Resumen de Categorías</h2>
+            <p>Total de categorías: <strong>{{ stats|length }}</strong></p>
+        </div>
+        
+        <!-- TABLA DE CATEGORÍAS -->
+        <div class="card">
+            <h3><i class="fas fa-list"></i> Detalles por Categoría</h3>
+            
+            <table class="tickets-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th><i class="fas fa-tag"></i> Categoría</th>
+                        <th><i class="fas fa-shopping-basket"></i> Productos</th>
+                        <th><i class="fas fa-euro-sign"></i> Total Gastado</th>
+                        <th>Promedio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for categoria, data in stats.items() %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ categoria }}</strong></td>
+                        <td>
+                            <a href="#"
+                                onclick="mostrarProductos('{{ categoria }}'); return false;"
+                                class="productos-link"> 
+                                <i class="fas fa-eye"></i>
+                                {{ data.cantidad }} items
+                            </a>
+                        </td>
+                        <td class="ticket-total">{{ "%.2f"|format(data.total) }}€</td>
+                        <td>{{ "%.2f"|format(data.total / data.cantidad) }}€</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2"><strong>TOTAL</strong></td>
+                        <td>
+                            <strong>{{ stats.values()|sum(attribute='cantidad') }} items</strong>
+                        </td>
+                        <td class="ticket-total">
+                            <strong>{{ "%.2f"|format(stats.values()|sum(attribute='total')) }}€</strong>
+                        </td>
+                        <td>-</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <!-- GRÁFICO -->
+        <div class="card">
+            <h3><i class="fas fa-chart-bar"></i> Distribución de Gastos</h3>
+            <div class="chart-container" style="height: 400px;">
+                <canvas id="graficoCategorias"></canvas>
+            </div>
+        </div>
+        
+    {% else %}
+        <div class="card">
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <h2>No hay categorías definidas</h2>
+                <p>Empieza a categorizar tus productos al crear tickets</p>
+                <a href="/nuevo_ticket" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Crear Ticket
+                </a>
+            </div>
+        </div>
+    {% endif %}
+    
+    <div class="form-actions">
+        <a href="/" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver al Inicio
+        </a>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div id="modalProductos" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close" onclick="cerrarModal()">&times;</span>
+        
+        <h2 id="tituloCategoria">
+            <i class="fas fa-tag"></i> Productos
+        </h2>
+
+        <div id="loadingProductos" style="text-align: center; padding: 2rem;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 3rem;"></i>
+            <p>Cargando productos...</p>
+        </div>
+
+        <div id="contenidoProductos" style="display: none;">
+            <table class="tickets-table" id="tablaProductos">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th><i class="fas fa-shopping-basket"></i> Producto</th>
+                        <th><i class="fas fa-euro-sign"></i> Precio</th>
+                        <th><i class="fas fa-store"></i> Tienda</th>
+                        <th><i class="fas fa-calendar"></i> Fecha</th>
+                        <th><i class="fas fa-comment"></i> Observación</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyProductos"></tbody>
+            </table>
+            
+            <div style="margin-top: 1rem; padding: 1rem; background: #f5f7fa; border-radius: 8px;">
+                <strong>Total de productos:</strong> <span id="totalProductos">0</span>
+            </div>
+        </div>
+        
+        <div id="errorProductos" style="display: none; padding: 2rem; text-align: center; color: red;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 3rem;"></i>
+            <p id="mensajeError">Error al cargar productos</p>
+        </div>
+    </div>
+</div>
+
+<!-- GRÁFICO CON CHART.JS -->
+{% if stats %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const categorias = {{ stats.keys()|list|tojson }};
+    const totales = [
+        {% for categoria, data in stats.items() %}
+            {{ data.total }},
+        {% endfor %}
+    ];
+    
+    const ctx = document.getElementById('graficoCategorias');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: categorias,
+            datasets: [{
+                label: 'Total gastado (€)',
+                data: totales,
+                backgroundColor: [
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(153, 102, 255, 0.7)',
+                    'rgba(255, 159, 64, 0.7)',
+                    'rgba(201, 203, 207, 0.7)',
+                ],
+                borderColor: [
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)',
+                    'rgba(201, 203, 207, 1)',
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+
+<!-- JAVASCRIPT PARA EL MODAL -->
+<script>
+function mostrarProductos(categoria) {
+    console.log('🔍 Mostrando productos de:', categoria);
+    
+    // Elementos del DOM
+    const modal = document.getElementById('modalProductos');
+    const titulo = document.getElementById('tituloCategoria');
+    const loading = document.getElementById('loadingProductos');
+    const contenido = document.getElementById('contenidoProductos');
+    const errorDiv = document.getElementById('errorProductos');
+    const bodyTabla = document.getElementById('bodyProductos');
+
+    // Actualizar título
+    titulo.innerHTML = `<i class="fas fa-tag"></i> Productos de: <span style="color: #4CAF50;">${categoria}</span>`;
+    
+    // Mostrar modal
+    modal.style.display = 'block';
+    loading.style.display = 'block';
+    contenido.style.display = 'none';
+    errorDiv.style.display = 'none';
+
+    // Limpiar tabla
+    bodyTabla.innerHTML = '';
+
+    // Hacer petición al servidor
+    fetch(`/api/productos_categoria/${encodeURIComponent(categoria)}`)
+        .then(response => {
+            console.log('📥 Respuesta:', response.status);
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('📊 Productos recibidos:', data);
+            
+            if (data.success && data.productos.length > 0) {
+                // Llenar tabla
+                data.productos.forEach((producto, index) => {
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td><strong>${producto.nombre}</strong></td>
+                        <td class="ticket-total">${producto.precio.toFixed(2)}€</td>
+                        <td>${producto.tienda}</td>
+                        <td>${producto.fecha.substring(0, 10)}</td>
+                        <td>${producto.observacion || '-'}</td>
+                    `;
+                    bodyTabla.appendChild(fila);
+                });
+                
+                // Actualizar total
+                document.getElementById('totalProductos').textContent = data.productos.length;
+                
+                // Ocultar loading y mostrar contenido
+                loading.style.display = 'none';
+                contenido.style.display = 'block';
+                
+                console.log('✅ Tabla mostrada correctamente');
+            } else {
+                throw new Error('No se encontraron productos en esta categoría');
+            }
+        })
+        .catch(err => {
+            console.error('❌ Error:', err);
+            
+            // Mostrar error
+            loading.style.display = 'none';
+            errorDiv.style.display = 'block';
+            document.getElementById('mensajeError').textContent = err.message;
+        });
+}
+
+// Cerrar modal
+function cerrarModal() {
+    console.log('🚪 Cerrando modal');
+    document.getElementById('modalProductos').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalProductos');
+    if (event.target === modal) {
+        cerrarModal();
+    }
+}
+
+// Cerrar modal con tecla ESC
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        cerrarModal();
+    }
+});
+</script>
+
+<!-- ESTILOS CSS -->
+<style>
+.productos-link {
+    color: #2196F3;
+    text-decoration: none;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.productos-link:hover {
+    color: #1976D2;
+    text-decoration: underline;
+}
+
+.modal {
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.6);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background-color: white;
+    margin: 3% auto;
+    padding: 2rem;
+    border: 1px solid #888;
+    width: 90%;
+    max-width: 1200px;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideDown 0.3s ease;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 32px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.close:hover,
+.close:focus {
+    color: #f44336;
+    transform: scale(1.2);
+}
+
+#tituloCategoria {
+    color: #333;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid #4CAF50;
+}
+
+#tablaProductos {
+    margin-top: 1rem;
+}
+
+#tablaProductos tbody tr:hover {
+    background-color: #f5f7fa;
+}
+
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        margin: 10% auto;
+        padding: 1rem;
+    }
+    
+    #tituloCategoria {
+        font-size: 1.3rem;
+    }
+}
+</style>
+
+{% endblock %}

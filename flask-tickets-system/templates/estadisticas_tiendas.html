@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Estadísticas por Tiendas - Gestor de Compras{% endblock %}
+
+{% block content %}
+
+<div class="stats-tiendas-page">
+    <div class="page-header">
+        <h1><i class="fas fa-store"></i> Análisis por Tiendas</h1>
+        <p class="subtitle">¿Dónde gastas más?</p>
+    </div>
+    
+    {% if datos.tiendas %}
+        <!-- TIENDA TOP -->
+        <div class="card highlight-card-green">
+            <div class="highlight-content">
+                <div class="trophy-icon">🏆</div>
+                <div>
+                    <h2>Tienda donde más has gastado</h2>
+                    <p class="store-name">{{ datos.tienda_top.nombre }}</p>
+                    <p class="store-amount">
+                        {{ "%.2f"|format(datos.tienda_top.total) }}€ 
+                        <span class="percentage">({{ datos.tienda_top.porcentaje }}% del total)</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TABLA COMPARATIVA -->
+        <div class="card">
+            <h3><i class="fas fa-list-ol"></i> Ranking de Tiendas</h3>
+            
+            <table class="tickets-table">
+                <thead>
+                    <tr>
+                        <th>Ranking</th>
+                        <th><i class="fas fa-store"></i> Tienda</th>
+                        <th><i class="fas fa-euro-sign"></i> Total Gastado</th>
+                        <th><i class="fas fa-percentage"></i> % del Total</th>
+                        <th>Barra</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tienda in datos.tiendas %}
+                    <tr>
+                        <td>
+                            {% if loop.index == 1 %}
+                                <span class="rank-badge gold">🥇 #{{ loop.index }}</span>
+                            {% elif loop.index == 2 %}
+                                <span class="rank-badge silver">🥈 #{{ loop.index }}</span>
+                            {% elif loop.index == 3 %}
+                                <span class="rank-badge bronze">🥉 #{{ loop.index }}</span>
+                            {% else %}
+                                <span class="rank-badge">#{{ loop.index }}</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ tienda.nombre }}</strong></td>
+                        <td class="ticket-total">{{ tienda.total }}€</td>
+                        <td>{{ tienda.porcentaje }}%</td>
+                        <td>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ tienda.porcentaje }}%"></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2"><strong>TOTAL GENERAL</strong></td>
+                        <td class="ticket-total"><strong>{{ datos.total_general }}€</strong></td>
+                        <td><strong>100%</strong></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <!-- GRÁFICO -->
+        <div class="card">
+            <h3><i class="fas fa-chart-pie"></i> Distribución Visual</h3>
+            <div class="chart-container" style="height: 500px;">
+                <canvas id="graficoTiendas"></canvas>
+            </div>
+        </div>
+        
+    {% else %}
+        <div class="card">
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <h2>No hay datos de tiendas</h2>
+                <p>Empieza creando tickets para ver estadísticas</p>
+            </div>
+        </div>
+    {% endif %}
+    
+    <div class="form-actions">
+        <a href="/estadisticas" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver a Estadísticas
+        </a>
+    </div>
+</div>
+
+{% if datos.tiendas %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const tiendas = {{ datos.tiendas | tojson }};
+    
+    const nombres = tiendas.map(t => t.nombre);
+    const totales = tiendas.map(t => t.total);
+    
+    const ctx = document.getElementById('graficoTiendas');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: nombres,
+            datasets: [{
+                data: totales,
+                backgroundColor: [
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)',
+                    'rgba(255, 159, 64, 0.8)',
+                    'rgba(201, 203, 207, 0.8)',
+                ],
+                borderColor: 'white',
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        font: {
+                            size: 14
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value.toFixed(2)}€ (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+
+<style>
+    .highlight-card-green {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+    }
+    
+    .highlight-content {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+    }
+    
+    .trophy-icon {
+        font-size: 5rem;
+    }
+    
+    .store-name {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0.5rem 0;
+    }
+    
+    .store-amount {
+        font-size: 1.5rem;
+    }
+    
+    .percentage {
+        opacity: 0.9;
+        font-size: 1.2rem;
+    }
+    
+    .rank-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: bold;
+        display: inline-block;
+    }
+    
+    .rank-badge.gold {
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        color: white;
+    }
+    
+    .rank-badge.silver {
+        background: linear-gradient(135deg, #C0C0C0, #808080);
+        color: white;
+    }
+    
+    .rank-badge.bronze {
+        background: linear-gradient(135deg, #CD7F32, #8B4513);
+        color: white;
+    }
+    
+    .progress-bar {
+        width: 100%;
+        height: 25px;
+        background: #e0e0e0;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4CAF50, #45a049);
+        transition: width 0.3s ease;
+    }
+</style>
+
+{% endblock %}
