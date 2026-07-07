@@ -1,203 +1,87 @@
-# Vision Transformer Benchmark
-## Análisis Comparativo: ViT, DeiT, Swin Transformer vs ResNet-50
+Comparativa de Vision Transformers vs CNN: ViT · DeiT · Swin-T · ResNet-50
 
----
+Comparación experimental de cuatro arquitecturas de clasificación de imágenes —tres Vision Transformers y una CNN clásica— evaluadas sobre el mismo conjunto de datos etiquetado, analizando no solo cuánto aciertan sino cómo de fiable es su seguridad y dónde miran para decidir.
 
-## 📋 Descripción del Proyecto
+Mostrar imagen
+Mostrar imagen
+Mostrar imagen
+Mostrar imagen
 
-Este proyecto realiza un benchmark exhaustivo de **4 modelos de visión por computadora** utilizando 50 imágenes de prueba aleatorias. Se comparan arquitecturas basadas en Transformers de última generación contra el baseline clásico ResNet-50, evaluando confianza de predicción, mapas de atención y correlaciones de rendimiento.
 
-**Objetivo:** Proporcionar un análisis comparativo riguroso para identificar trade-offs entre precisión, eficiencia computacional y robustez en tareas de clasificación de imágenes.
+🎯 Motivación
 
----
+Desde 2020, los Vision Transformers proponen una alternativa a las CNN basada en atención global en lugar de convoluciones locales. Este proyecto compara cuatro modelos representativos de esa evolución —ResNet-50 (CNN clásica, 2015), ViT-B/16 (primer Transformer puro, 2020), DeiT-B (eficiente en datos vía destilación, 2021) y Swin-T (eficiente en cómputo vía ventanas de atención, 2021)— para entender su comportamiento real más allá del accuracy: rendimiento, calibración e interpretabilidad.
 
-## 🏗️ Modelos Evaluados
+Trabajo basado en el survey Transformers for Vision (Palanisamy et al., IEEE Access, 2025).
 
-| Modelo | Tipo | Parámetros | Características |
-|--------|------|-----------|-----------------|
-| **ViT-B/16** | Vision Transformer | 86M | Atención global, máxima precisión |
-| **DeiT-B** | Data-efficient Transformer | 86M | Destilación de conocimiento |
-| **Swin-T** | Shifted Window Transformer | 28M | Atención local por ventanas |
-| **ResNet-50** | CNN Convolucional | 25.6M | Baseline: arquitectura clásica |
+🔬 Metodología
 
----
 
-## 📊 Resultados Principales
+Dataset: Imagenette (10 clases de ImageNet), 30 imágenes/clase → 300 imágenes con etiqueta real.
+Modelos: los 4 preentrenados en ImageNet-1K, en modo evaluación, sin fine-tuning.
+Métricas: Accuracy Top-1/Top-5 · Confianza (softmax) · Calibración (confianza en aciertos vs. fallos) · Correlación de Pearson entre modelos · Mapas de atención (ViT/DeiT).
 
-### Estadísticas de Confianza (Top-1)
 
-```
-Modelo       Media    Desv. Est.    Mín      Máx
-───────────────────────────────────────────────────
-ViT-B/16     82.3%      8.5%      45.2%    98.1%
-DeiT-B       81.7%      9.1%      42.8%    97.5%
-Swin-T       79.2%     10.2%      38.1%    96.8%
-ResNet-50    77.5%     11.4%      35.2%    95.2%
-```
+📊 Resultados
 
-### Hallazgos Clave
+ModeloAcc. Top-1Acc. Top-5Conf. mediaViT-B/1683.0%97.7%84.3%DeiT-B85.0%99.0%89.5%Swin-T82.0%99.3%75.7%ResNet-5080.3%97.0%80.0%
 
-✅ **ViT-B/16** lidera con mayor confianza promedio (+4.8% vs ResNet-50)  
-✅ **DeiT-B** demuestra eficiencia comparable a ViT con entrenamiento mejorado  
-✅ **Swin-T** ofrece mejor balance: 28M parámetros con 79.2% confianza  
-⚠️ **ResNet-50** más variable pero con base sólida como baseline  
+300 imágenes es una muestra pequeña: las diferencias de accuracy son indicativas, no concluyentes.
 
----
+<p align="center">
+  <img src="figures/accuracy.png" width="48%">
+  <img src="figures/calibracion.png" width="48%">
+</p>
+🔑 Hallazgo principal: accuracy alto ≠ confianza fiable
 
-## 📈 Visualizaciones Generadas
+DeiT es el modelo con mejor accuracy, pero también el peor calibrado: cuando falla, sigue reportando un 64% de confianza (el resto cae a 47–53%). Es decir, su seguridad es la que menos avisa de un posible error — probablemente por efecto de la destilación de conocimiento, que produce distribuciones de probabilidad más "afiladas".
 
-El pipeline automatizado produce **6 figuras de análisis**:
+La correlación de confianza entre modelos también revela una agrupación por familia arquitectónica: los tres Transformers correlacionan más entre sí (0.70–0.76) que con la CNN (0.62–0.66), es decir, tienden a acertar y fallar en las mismas imágenes.
 
-### Gráficos Agregados
-- **Boxplot** - Distribución de confianza por modelo
-- **Heatmap** - Matriz de correlación entre predicciones
-- **Barplot** - Media ± desviación estándar con comparativas
+<p align="center">
+  <img src="figures/heatmap.png" width="55%">
+</p>
+🧠 Interpretabilidad: cuando la atención explica el error
 
-### Análisis Detallados (3 casos de estudio)
-- **Imagen A** - Alto acuerdo entre modelos
-  - Imagen + Mapa de atención + Rankings Top-3
-- **Imagen B** - Máxima discrepancia de predicciones
-  - Análisis de divergencias por arquitectura
-- **Imagen C** - Rendimiento más bajo del conjunto
-  - Identificación de patrones de error
+En una imagen del interior de una iglesia, los cuatro modelos predicen erróneamente "vault" (bóveda) con confianza alta (82–90%). El mapa de atención de ViT/DeiT muestra por qué: el modelo se fija en el techo abovedado, una característica real de la imagen pero no la que define la clase "iglesia". El fallo es interpretable, no aleatorio.
 
----
+<p align="center">
+  <img src="figures/caso_C_iglesia.png" width="80%">
+</p>
+🛠️ Stack
 
-## 🚀 Ejecución Rápida
+Python · PyTorch · 🤗 Transformers (ViT, DeiT, Swin) · torchvision (ResNet) · matplotlib / seaborn
 
-### Requisitos
-```
-- Python 3.8+
-- GPU (recomendado: NVIDIA con CUDA)
-- Google Drive (para cacheo opcional)
-```
+🚀 Uso
 
-### Instrucciones
+Opción rápida: pulsa el badge Open in Colab de arriba y ejecuta las celdas en orden (recomendado — usa GPU gratuita de Colab).
 
-**En Google Colab:**
-```python
-# 1. Montar Google Drive (opcional - para cachear descargas)
-from google.colab import drive
-drive.mount('/content/drive')
+En local:
 
-# 2. Ejecutar todas las celdas secuencialmente
-# El notebook descarga modelos automáticamente
+bashpip install -r requirements.txt
+jupyter notebook notebook.ipynb
 
-# 3. Descargar resultados
-# Se genera automáticamente: outputs.zip
-```
+El notebook descarga Imagenette automáticamente (sin necesidad de token de Kaggle) y ejecuta el pipeline completo: inferencia → métricas → visualizaciones → mapas de atención. En CPU la inferencia es lenta; se recomienda GPU (T4 gratuita en Colab es suficiente).
 
-**En máquina local:**
-```bash
-# Clonar/descargar repositorio
-cd vision-transformer-benchmark
+📁 Estructura
 
-# Instalar dependencias
-pip install -r requirements.txt
+Comparacion ViT, DeiT, Swin Transformer vs ResNet_50/
+├── Daniel_Duenas_AP_Codigo.ipynb   # Pipeline completo
+├── figures/                          # Gráficos generados
+├── requirements.txt
+└── README.md
 
-# Ejecutar análisis
-python benchmark.py --images 50 --output ./results
+Este proyecto forma parte de mi portafolio de proyectos.
 
-# Los resultados se guardan en ./results/
-```
+📚 Referencias
 
-**Tiempo estimado:** 5-8 minutos (con GPU)
 
----
+Palanisamy et al., "Transformers for Vision: A Survey on Innovative Methods for Computer Vision", IEEE Access, 2025.
+Dosovitskiy et al., "An Image is Worth 16x16 Words" (ViT), 2020.
+Touvron et al., "Training Data-Efficient Image Transformers & Distillation" (DeiT), 2021.
+Liu et al., "Swin Transformer: Hierarchical Vision Transformer using Shifted Windows", 2021.
+He et al., "Deep Residual Learning for Image Recognition" (ResNet), 2016.
 
-## 📁 Estructura de Salida
 
-```
-outputs/
-├── boxplot_confianza.png           # Distribución completa
-├── heatmap_correlacion.png         # Matriz de correlaciones
-├── barras_media_std.png            # Comparativa estadística
-│
-├── figura_imagen_A.png             # [ALTO ACUERDO]
-│   ├── Imagen original
-│   ├── Mapas de atención (ViT + DeiT)
-│   └── Rankings Top-3 por modelo
-│
-├── figura_imagen_B.png             # [MÁXIMA DISCREPANCIA]
-│   └── Análisis de divergencias
-│
-└── figura_imagen_C.png             # [BAJO RENDIMIENTO]
-    └── Análisis de fallos comunes
-```
 
----
-
-## 🛠️ Tecnologías & Dependencias
-
-```
-PyTorch              2.0+        # Framework principal
-transformers         4.30+       # Hugging Face (modelos)
-torchvision          0.15+       # Utilidades de visión
-numpy                1.24+       # Operaciones numéricas
-seaborn              0.12+       # Visualización avanzada
-matplotlib           3.7+        # Gráficos base
-tqdm                 4.65+       # Barras de progreso
-Pillow               9.5+        # Procesamiento de imágenes
-```
-
----
-
-## 💡 Características Técnicas
-
-### Métricas Evaluadas
-- **Confianza de predicción** (softmax Top-1)
-- **Mapas de atención** (para Transformers)
-- **Correlación de ranking** (Spearman ρ)
-- **Varianza entre modelos** (std y coef. variación)
-
-### Metodología
-✓ Muestreo aleatorio reproducible (seed=42)  
-✓ Normalización estándar ImageNet  
-✓ Inferencia en batch para eficiencia  
-✓ Análisis estadístico robusto  
-
----
-
-## 📝 Conclusiones
-
-| Aspecto | Ganador | Notas |
-|---------|---------|-------|
-| **Precisión máxima** | ViT-B/16 | +4.8% vs ResNet, pero 3.4x parámetros |
-| **Eficiencia** | Swin-T | 28M parámetros, 79.2% confianza |
-| **Robustez** | DeiT-B | Menor varianza, entrenamiento mejorado |
-| **Baseline** | ResNet-50 | Sólido, computacionalmente ligero |
-
-### Recomendaciones
-- **Producción con recursos limitados:** Swin-T
-- **Máxima precisión:** ViT-B/16
-- **Producción escalable:** DeiT-B
-- **Casos conservadores:** ResNet-50
-
----
-
-## 👤 Autor
-
-**Portafolio:** Junior ML Engineer - Computer Vision  
-📧 [Tu email]  
-🔗 [Tu LinkedIn/GitHub]
-
----
-
-## 📜 Licencia
-
-MIT License - Libre para uso educativo y comercial
-
----
-
-## 🔗 Referencias
-
-- [Vision Transformer (ViT)](https://arxiv.org/abs/2010.11929)
-- [Data-efficient Image Transformers (DeiT)](https://arxiv.org/abs/2012.12556)
-- [Swin Transformer](https://arxiv.org/abs/2103.14030)
-- [ResNet](https://arxiv.org/abs/1512.03385)
-- [Hugging Face Transformers](https://huggingface.co/transformers/)
-
----
-
-**Última actualización:** Junio 2026  
-**Estado:** ✅ Funcional | Tested en Google Colab
+<p align="center"><i>Daniel Dueñas Díaz — Proyecto de Aprendizaje Profundo, Universidad de Córdoba</i></p>
